@@ -100,7 +100,7 @@ Main layout
             android:text="Tap here to load an image"
             android:textAllCaps="true"
             android:drawableStart="@ref/0x7f02000f" />
-<View
+    <View
         android:background="@ref/0x7f050004"
         android:layout_width="-1"
         android:layout_height="dimension(513)" />
@@ -143,3 +143,37 @@ Main layout
             android:drawableStart="@ref/0x7f02000c" />
     </LinearLayout>
 </LinearLayout>
+                                                   
+                                                   
+                                                   
+                                                   
+ 
+Menu layout
+
+
+xml version="1.0" encoding="utf-8"?>
+<menu
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:textColor="@ref/0x7f050001"
+    android:layout_width="-2"
+    android:layout_height="-2">
+
+    <item
+        android:icon="@ref/0x0108004e"
+        android:id="@ref/0x7f0a0016"
+        android:titleCondensed="Save"
+        android:showAsAction="0x1" />
+
+    <item
+        android:id="@ref/0x7f0a0017"
+        android:layout_width="-2"
+        android:layout_height="-2"
+        android:title="FAQ" />
+
+    <item
+        android:id="@ref/0x7f0a0018"
+        android:layout_width="-2"
+        android:layout_height="-2"
+        android:title="About" />
+</menu>
+                                                  
