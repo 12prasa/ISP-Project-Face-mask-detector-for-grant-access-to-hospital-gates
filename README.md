@@ -1,179 +1,141 @@
-# Project-Progress-Zoro-Steganography_information-Security-Project-IE3092
+# Project-Progress_Face mask detector for grant access to hospital gates_information-Security-Project-IE3092
 
-Mainfest.xml layout
+#train mask detector
 
-<?xml version="1.0" encoding="utf-8"?>
-<manifest
-    xmlns:android="http://schemas.android.com/apk/res/android"
-    android:versionCode="4"
-    android:versionName="1.0"
-    package="com.meznik.Steganography">
+# import the necessary packages
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from tensorflow.keras.applications import MobileNetV2
+from tensorflow.keras.layers import AveragePooling2D
+from tensorflow.keras.layers import Dropout
+from tensorflow.keras.layers import Flatten
+from tensorflow.keras.layers import Dense
+from tensorflow.keras.layers import Input
+from tensorflow.keras.models import Model
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.applications.mobilenet_v2 import preprocess_input
+from tensorflow.keras.preprocessing.image import img_to_array
+from tensorflow.keras.preprocessing.image import load_img
+from tensorflow.keras.utils import to_categorical
+from sklearn.preprocessing import LabelBinarizer
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import classification_report
+from imutils import paths
+import matplotlib.pyplot as plt
+import numpy as np
+import os
 
-    <uses-sdk
-        android:minSdkVersion="14" />
+# initialize the initial learning rate, number of epochs to train for,
+# and batch size
+INIT_LR = 1e-4
+EPOCHS = 20
+BS = 32
 
-    <application
-        android:label="@ref/0x7f070000"
-        android:icon="@ref/0x7f02000e"
-        android:largeHeap="true">
+DIRECTORY = r"C:\Users\oshad\Desktop\project 1\Face-Mask-Detection-master\dataset"
+CATEGORIES = ["with_mask", "without_mask"]
 
-        <activity
-            android:theme="@ref/0x7f080016"
-            android:name=".app.MainActivity"
-            android:screenOrientation="1">
+# grab the list of images in our dataset directory, then initialize
+# the list of data (i.e., images) and class images
+print("[INFO] loading images...")
 
-            <intent-filter>
+data = []
+labels = []
 
-                <action
-                    android:name="android.intent.action.MAIN" />
+for category in CATEGORIES:
+    path = os.path.join(DIRECTORY, category)
+    for img in os.listdir(path):
+    	img_path = os.path.join(path, img)
+    	image = load_img(img_path, target_size=(224, 224))
+    	image = img_to_array(image)
+    	image = preprocess_input(image)
 
-                <category
-                    android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
+    	data.append(image)
+    	labels.append(category)
 
-        <activity
-            android:theme="@ref/0x7f080017"
-            android:label="@ref/0x7f070001"
-            android:name=".app.EncodeActivity"
-            android:screenOrientation="1" />
+# perform one-hot encoding on the labels
+lb = LabelBinarizer()
+labels = lb.fit_transform(labels)
+labels = to_categorical(labels)
 
-        <activity
-            android:theme="@ref/0x7f080017"
-            android:label="@ref/0x7f070003"
-            android:name=".app.DecodeActivity"
-            android:screenOrientation="1" />
+data = np.array(data, dtype="float32")
+labels = np.array(labels)
 
-        <activity
-            android:theme="@ref/0x7f080018“a
-            android:label="Help"
-            android:name=".app.AboutActivity"
-            android:screenOrientation="1" />
+(trainX, testX, trainY, testY) = train_test_split(data, labels,
+	test_size=0.20, stratify=labels, random_state=42)
 
-        <activity
-            android:theme="@ref/0x7f080018"
-            android:label="FAQ"
-            android:name=".app.FaqActivity"
-            android:screenOrientation="1" />
-    </application>
+# construct the training image generator for data augmentation
+aug = ImageDataGenerator(
+	rotation_range=20,
+	zoom_range=0.15,
+	width_shift_range=0.2,
+	height_shift_range=0.2,
+	shear_range=0.15,
+	horizontal_flip=True,
+	fill_mode="nearest")
 
-    <uses-permission
-        android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+# load the MobileNetV2 network, ensuring the head FC layer sets are
+# left off
+baseModel = MobileNetV2(weights="imagenet", include_top=False,
+	input_tensor=Input(shape=(224, 224, 3)))
 
-    <uses-permission
-        android:name="android.permission.READ_EXTERNAL_STORAGE" />
-</manifest>
+# construct the head of the model that will be placed on top of the
+# the base model
+headModel = baseModel.output
+headModel = AveragePooling2D(pool_size=(7, 7))(headModel)
+headModel = Flatten(name="flatten")(headModel)
+headModel = Dense(128, activation="relu")(headModel)
+headModel = Dropout(0.5)(headModel)
+headModel = Dense(2, activation="softmax")(headModel)
 
+# place the head FC model on top of the base model (this will become
+# the actual model we will train)
+model = Model(inputs=baseModel.input, outputs=headModel)
 
+# loop over all layers in the base model and freeze them so they will
+# *not* be updated during the first training process
+for layer in baseModel.layers:
+	layer.trainable = False
 
-Main layout
+# compile our model
+print("[INFO] compiling model...")
+opt = Adam(lr=INIT_LR, decay=INIT_LR / EPOCHS)
+model.compile(loss="binary_crossentropy", optimizer=opt,
+	metrics=["accuracy"])
 
-<?xml version="1.0" encoding="utf-8"?>
-<LinearLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
-    android:orientation="1"
-    android:layout_width="-1"
-    android:layout_height="-1">
+# train the head of the network
+print("[INFO] training head...")
+H = model.fit(
+	aug.flow(trainX, trainY, batch_size=BS),
+	steps_per_epoch=len(trainX) // BS,
+	validation_data=(testX, testY),
+	validation_steps=len(testX) // BS,
+	epochs=EPOCHS)
 
-    <FrameLayout
-        android:layout_width="-1"
-        android:layout_height="dimension(257)"
-        android:layout_weight="1090519040.000000">
+# make predictions on the testing set
+print("[INFO] evaluating network...")
+predIdxs = model.predict(testX, batch_size=BS)
 
-        <ImageView
-            android:gravity="0x11"
-            android:id="@ref/0x7f0a0010"
-            android:padding="dimension(2560)"
-            android:layout_width="-1"
-            android:layout_height="-1"
-            android:scaleType="7"
-            android:onClick="openImage" />
+# for each image in the testing set we need to find the index of the
+# label with corresponding largest predicted probability
+predIdxs = np.argmax(predIdxs, axis=1)
 
-        <TextView
-            android:textSize="dimension(5122)"
-            android:textColor="@ref/0x7f050006"
-            android:gravity="0x11"
-            android:layout_gravity="0x51"
-            android:id="@ref/0x7f0a0011"
-            android:layout_width="-2"
-            android:layout_height="-1"
-            android:text="Tap here to load an image"
-            android:textAllCaps="true"
-            android:drawableStart="@ref/0x7f02000f" />
-    <View
-        android:background="@ref/0x7f050004"
-        android:layout_width="-1"
-        android:layout_height="dimension(513)" />
+# show a nicely formatted classification report
+print(classification_report(testY.argmax(axis=1), predIdxs,
+	target_names=lb.classes_))
 
-    <EditText
-        android:textColor="@ref/0x7f050004"
-        android:gravity="0x11"
-        android:id="@ref/0x7f0a0012"
-        android:layout_width="-1"
-        android:layout_height="-2"
-        android:layout_marginLeft="dimension(2561)"
-        android:layout_marginRight="dimension(2561)"
-        android:hint="@ref/0x7f070004"
-        android:maxLength="8"
-        android:inputType="0x20081" />
+# serialize the model to disk
+print("[INFO] saving mask detector model...")
+model.save("mask_detector.model", save_format="h5")
 
-    <LinearLayout
-        android:layout_width="-1"
-        android:layout_height="dimension(257)"
-        android:layout_weight="1065353216.000000">
-
-        <Button
-            android:textColor="@ref/0x7f050001"
-            android:id="@ref/0x7f0a0013"
-            android:layout_width="dimension(257)"
-            android:layout_height="-1"
-            android:text="ENCODE"
-            android:layout_weight="1065353216.000000"
-            android:onClick="encodeButtonClicked"
-            android:drawableStart="@ref/0x7f02000d" />
-
-        <Button
-            android:textColor="@ref/0x7f050001"
-            android:id="@ref/0x7f0a0014"
-            android:layout_width="dimension(257)"
-            android:layout_height="-1"
-            android:text="DECODE"
-            android:layout_weight="1065353216.000000"
-            android:onClick="decodeButtonClicked"
-            android:drawableStart="@ref/0x7f02000c" />
-    </LinearLayout>
-</LinearLayout>
-                                                   
-                                                   
-                                                   
-                                                   
- 
-Menu layout
-
-
-xml version="1.0" encoding="utf-8"?>
-<menu
-    xmlns:android="http://schemas.android.com/apk/res/android"
-    android:textColor="@ref/0x7f050001"
-    android:layout_width="-2"
-    android:layout_height="-2">
-
-    <item
-        android:icon="@ref/0x0108004e"
-        android:id="@ref/0x7f0a0016"
-        android:titleCondensed="Save"
-        android:showAsAction="0x1" />
-
-    <item
-        android:id="@ref/0x7f0a0017"
-        android:layout_width="-2"
-        android:layout_height="-2"
-        android:title="FAQ" />
-
-    <item
-        android:id="@ref/0x7f0a0018"
-        android:layout_width="-2"
-        android:layout_height="-2"
-        android:title="About" />
-</menu>
-                                                  
+# plot the training loss and accuracy
+N = EPOCHS
+plt.style.use("ggplot")
+plt.figure()
+plt.plot(np.arange(0, N), H.history["loss"], label="train_loss")
+plt.plot(np.arange(0, N), H.history["val_loss"], label="val_loss")
+plt.plot(np.arange(0, N), H.history["accuracy"], label="train_acc")
+plt.plot(np.arange(0, N), H.history["val_accuracy"], label="val_acc")
+plt.title("Training Loss and Accuracy")
+plt.xlabel("Epoch #")
+plt.ylabel("Loss/Accuracy")
+plt.legend(loc="lower left")
+plt.savefig("plot.png")
